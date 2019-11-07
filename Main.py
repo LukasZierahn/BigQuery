@@ -7,11 +7,24 @@ from sklearn.linear_model import LinearRegression
 from sklearn import metrics
 from sklearn.preprocessing import PolynomialFeatures
 
-dataset = pd.read_csv("/Users/lukas/projects/Kaggle/BigQuery/bigquery-geotab-intersection-congestion/train.csv")
+def getCities(dataset, input):
+    cities = []
+    for row in range(len(dataset.index)):
+        city = dataset.at[row, "City"]
+        if (city == "Philadelphia"):
+            cities.append([1, 0, 0])
+        elif (city == "Boston"):
+            cities.append([0, 1, 0])
+        elif (city == "Atlanta"):
+            cities.append([0, 0, 1])
+        else:
+            cities.append([0, 0, 0])
+    return np.c_[input, cities]
 
-#X = dataset.filter(["TotalTimeStopped_p20","TotalTimeStopped_p40","TotalTimeStopped_p50","TotalTimeStopped_p60","TotalTimeStopped_p80","TimeFromFirstStop_p20","TimeFromFirstStop_p40","TimeFromFirstStop_p50","TimeFromFirstStop_p60","TimeFromFirstStop_p80","DistanceToFirstStop_p20","DistanceToFirstStop_p40","DistanceToFirstStop_p50","DistanceToFirstStop_p60","DistanceToFirstStop_p80"], axis = 1)
-inpX = dataset.filter(["Hour", "Month", "Weekend"], axis = 1).values
-x = inpX
+
+dataset = pd.read_csv("bigquery-geotab-intersection-congestion/train.csv")
+
+x = dataset.filter(["Hour", "Month", "Weekend"], axis = 1).values
 yDatasetLabels = ["TotalTimeStopped_p20", "TotalTimeStopped_p50", "TotalTimeStopped_p80", "DistanceToFirstStop_p20", "DistanceToFirstStop_p50", "DistanceToFirstStop_p80"]
 
 yDataset = []
@@ -20,6 +33,12 @@ for label in yDatasetLabels:
     y = dataset.filter([label], axis = 1).values[:,0]
     yDataset.append(y)
 
+print("starting cities")
+x = getCities(dataset, x)
+
+print(x)
+
+print("Fitting", yDataset)
 regressors = []
 hourPolys = []
 monthPolys = []
@@ -29,33 +48,30 @@ for y in yDataset:
     hourX = hourPoly.fit_transform(x, y=y)
     hourPolys.append(hourPoly)
 
-    print("its this")
-    print(hourX)
-    print(y)
-
     regressor = LinearRegression()
     regressor.fit(hourX, y)
     regressors.append(regressor)
 
-testInp = pd.read_csv("/Users/lukas/projects/Kaggle/BigQuery/bigquery-geotab-intersection-congestion/test.csv")
+testInp = pd.read_csv("bigquery-geotab-intersection-congestion/test.csv")
 test = testInp.filter(["Hour", "Month", "Weekend"], axis = 1)
-
+test = getCities(testInp, test)
 
 print("Starting Labels")
-resultLabels = [None] * (len(test.index) * 6)
+resultLabels = [None] * (len(testInp.index) * 6)
 position = 0
 for j in range(6):
-    for row in range(len(test.index)):
+    for row in range(len(testInp.index)):
         if (row % 10000 == 0):
-            print((j + row * 1.0 / len(test.index)) / 6.0)
+            print("\r%s" % (str((j + row * 1.0 / len(testInp.index)) / 6.0)), end="")
         resultLabels[position] = "".join([str(testInp.at[row, "RowId"]), "_", str(j)])
         position += 1
+print("")
 
-print("Finished Labels")
+print("Prediction")
 result = []
 for j in range(6):
     print(j)
-    testX = hourPolys[j].transform(test.values)
+    testX = hourPolys[j].transform(test)
     prediction = regressors[j].predict(testX)
     result.append(prediction)
 
