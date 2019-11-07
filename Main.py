@@ -21,10 +21,31 @@ def getCities(dataset, input):
             cities.append([0, 0, 0])
     return np.c_[input, cities]
 
+def addDirection(dataset, key, input):
+    directions = []
+    for row in range(len(dataset.index)):
+        dir = dataset.at[row, key]
+        if (dir == "N"):
+            directions.append([1, 0, 0, 0, 0, 0, 0])
+        elif (dir == "NE"):
+            directions.append([0, 1, 0, 0, 0, 0, 0])
+        elif (dir == "E"):
+            directions.append([0, 0, 1, 0, 0, 0, 0])
+        elif (dir == "SE"):
+            directions.append([0, 0, 0, 1, 0, 0, 0])
+        elif (dir == "S"):
+            directions.append([0, 0, 0, 0, 1, 0, 0])
+        elif (dir == "SW"):
+            directions.append([0, 0, 0, 0, 0, 1, 0])
+        elif (dir == "W"):
+            directions.append([0, 0, 0, 0, 0, 0, 1])
+        else:
+            directions.append([0, 0, 0, 0, 0, 0, 0])
+    return np.c_[input, directions]
+
 
 dataset = pd.read_csv("bigquery-geotab-intersection-congestion/train.csv")
 
-x = dataset.filter(["Hour", "Month", "Weekend"], axis = 1).values
 yDatasetLabels = ["TotalTimeStopped_p20", "TotalTimeStopped_p50", "TotalTimeStopped_p80", "DistanceToFirstStop_p20", "DistanceToFirstStop_p50", "DistanceToFirstStop_p80"]
 
 yDataset = []
@@ -34,9 +55,12 @@ for label in yDatasetLabels:
     yDataset.append(y)
 
 print("starting cities")
+x = dataset.filter(["Hour", "Month", "Weekend"], axis = 1).values
 x = getCities(dataset, x)
+x = addDirection(dataset, "EntryHeading", x)
+x = addDirection(dataset, "ExitHeading", x)
 
-print(x)
+print(len(x[:,0]))
 
 print("Fitting", yDataset)
 regressors = []
@@ -44,7 +68,7 @@ hourPolys = []
 monthPolys = []
 for y in yDataset:
     print(len(y),len(x[:,0]))
-    hourPoly = PolynomialFeatures(degree = 4)
+    hourPoly = PolynomialFeatures(degree = 3)
     hourX = hourPoly.fit_transform(x, y=y)
     hourPolys.append(hourPoly)
 
@@ -55,6 +79,8 @@ for y in yDataset:
 testInp = pd.read_csv("bigquery-geotab-intersection-congestion/test.csv")
 test = testInp.filter(["Hour", "Month", "Weekend"], axis = 1)
 test = getCities(testInp, test)
+test = addDirection(testInp, "EntryHeading", test)
+test = addDirection(testInp, "ExitHeading", test)
 
 print("Starting Labels")
 resultLabels = [None] * (len(testInp.index) * 6)
